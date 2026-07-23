@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.env
+.DS_Store
+# 대용량 원본 패널 캐시는 커밋하지 않는다 (DB에서 재생성). 집계 결과 CSV는 커밋.
+data/etf_panel.parquet
