@@ -85,9 +85,20 @@ python run_backtest.py                 # 이벤트 스터디 + 롱숏 포트폴�
 python make_charts.py                  # results/*.png
 ```
 
-> 이 저장소가 만들어진 샌드박스는 정책상 DB로 **직접 접속이 차단**돼 있어, 헤드라인 수치는
-> Supabase MCP 경유 SQL 집계로 산출했고 `data/*.csv`에 캐시했다. `flow_divergence/` pandas
-> 구현은 동일 정의를 그대로 옮긴 것으로, DATABASE_URL만 있으면 전 구간을 재계산한다.
+### 산출물 현황
+
+| 산출물 | 상태 | 비고 |
+|---|---|---|
+| 이벤트 스터디 (헤드라인) | ✅ 완료 · `data/event_study.csv` | 전체 65 ETF·전 구간 SQL 집계 |
+| 이벤트 스터디 차트 | ✅ `results/event_study.png`, `hitrate_20d.png` | |
+| 롱-숏 수익곡선 · 서브기간/파라미터 강건성 | ⏳ 코드 준비완료, `run_backtest.py`로 로컬 실행 | 아래 참조 |
+
+> **왜 수익곡선이 미리 안 담겼나:** 이 저장소를 만든 샌드박스는 정책상 DB **직접 접속이
+> 차단(403)**돼 Supabase **MCP 경유로만** 데이터 접근이 가능한데, 이 인스턴스(서울, 소형)에서
+> `bbg×fmp` 조인이 무거워 MCP의 **60초 실행 제한**에 걸린다(콜드 캐시 시 조인 하나가 60초 초과).
+> 헤드라인 이벤트 스터디는 캐시가 따뜻할 때 확보했다. 사용자 환경에서는 이 제약이 없으므로
+> `python run_backtest.py` 한 방이면 수익곡선·Sharpe·서브기간·파라미터 그리드까지 전부 나온다.
+> `flow_divergence/` pandas 구현은 `sql/build_panel.sql`과 정의가 1:1로 동일하다(합성데이터 검증 완료).
 
 ---
 

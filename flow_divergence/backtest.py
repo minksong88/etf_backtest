@@ -109,14 +109,6 @@ def portfolio_daily(panel: pd.DataFrame, p: Params = DEFAULT) -> pd.DataFrame:
     return daily
 
 
-# 전략 정의: 각 전략 = (롱 leg, 숏 leg)
-STRATEGIES = {
-    "DIV_REVERSAL": ("bull_ret", "bear_ret"),   # 사용자 원가설: 바닥 매수 / 천장 매도
-    "FLOW_CONFIRM": ("cup_ret", "bull_ret"),    # 데이터가 지지: 확인상승 매수 / falling-knife 매도
-    "SHORT_BOTH_DIV": ("univ_ret", None),       # placeholder, 아래에서 특수처리
-}
-
-
 def strategy_returns(daily: pd.DataFrame) -> pd.DataFrame:
     """일별 leg 수익률 → 전략별 롱숏 일별 수익률."""
     out = pd.DataFrame(index=daily.index)
