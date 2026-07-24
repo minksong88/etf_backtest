@@ -10,6 +10,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 ROOT = pathlib.Path(__file__).resolve().parent
 DATA, RES = ROOT / "data", ROOT / "results"
@@ -69,22 +70,65 @@ def chart_hitrate():
     print("wrote results/hitrate_20d.png")
 
 
+def _stats(m: pd.Series) -> dict:
+    """월별 수익률 → 연율화 성과지표."""
+    r = m.dropna()
+    ann = r.mean() * 12
+    vol = r.std(ddof=1) * (12 ** 0.5)
+    sharpe = ann / vol if vol > 0 else float("nan")
+    curve = (1 + r).cumprod()
+    mdd = (curve / curve.cummax() - 1).min()
+    return dict(ann_ret=ann, ann_vol=vol, sharpe=sharpe,
+                max_dd=mdd, hit=(r > 0).mean(), n=len(r))
+
+
 def chart_equity():
     p = DATA / "strategy_monthly.csv"
     if not p.exists():
-        print("skip equity curve (strategy_monthly.csv 미생성)"); return
+        print("skip equity curve (strategy_monthly.csv 없음)"); return
     m = pd.read_csv(p, parse_dates=["month"]).set_index("month").sort_index()
-    fig, ax = plt.subplots(figsize=(9.5, 5))
-    colors = {"FLOW_CONFIRM": "#2e7d5b", "DIV_REVERSAL": "#c0504d",
-              "SHORT_DIVERGENCE": "#3b6ea5", "univ": "#999"}
-    for c in [x for x in m.columns if x in colors]:
-        curve = (1 + m[c].fillna(0)).cumprod()
-        ax.plot(curve.index, curve.values, label=c, color=colors[c], lw=1.8)
-    ax.axhline(1, color="#333", lw=.7)
-    ax.set_ylabel("Cumulative growth of $1 (non-overlapping monthly)")
-    ax.set_title("Long-short strategy equity curves\n"
-                 "market-neutral within 65-ETF universe")
-    ax.legend(fontsize=9)
+
+    # 성과지표 저장/출력
+    summ = pd.DataFrame({c: _stats(m[c]) for c in m.columns}).T
+    summ = summ.round(4)
+    summ.to_csv(RES / "strategy_summary.csv")
+    print("\n=== 월별 기준 성과 (W=10, 보유 10일, 시장중립) ===")
+    print(summ.to_string())
+
+    # 누적곡선
+    series = {
+        "LS  (long confirm − short divergence)": ("LS", "#b0473d", 2.4),
+        "Long book − universe": ("long_excess", "#2f7d59", 1.6),
+        "Universe − short book": ("short_excess", "#b07d2a", 1.6),
+        "Universe (equal-wt 65 ETF)": ("univ", "#8b909b", 1.3),
+        "SPY": ("spy", "#3b6ea5", 1.3),
+    }
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12.5, 5.2),
+                                   gridspec_kw={"width_ratios": [1.55, 1]})
+    for label, (col, color, lw) in series.items():
+        if col not in m.columns:
+            continue
+        curve = (1 + m[col].fillna(0)).cumprod()
+        ax1.plot(curve.index, curve.values, label=label, color=color, lw=lw)
+    ax1.axhline(1, color="#333", lw=.7)
+    ax1.set_ylabel("Cumulative growth of $1")
+    ax1.set_title("Flow-confirmation long-short — equity curves\n"
+                  "W=10, 10-day hold, monthly-compounded, market-neutral")
+    ax1.legend(fontsize=8.3, loc="upper left")
+
+    # LS 전용 (스케일 확대)
+    ls = (1 + m["LS"].fillna(0)).cumprod()
+    ax2.plot(ls.index, ls.values, color="#b0473d", lw=2.2)
+    ax2.fill_between(ls.index, 1, ls.values, color="#b0473d", alpha=.10)
+    ax2.axhline(1, color="#333", lw=.7)
+    st_ls = _stats(m["LS"])
+    ax2.set_title(f"LS only  ·  Sharpe {st_ls['sharpe']:.2f}  ·  "
+                  f"ann {st_ls['ann_ret']*100:.1f}%  ·  MDD {st_ls['max_dd']*100:.1f}%",
+                  fontsize=10)
+    ax2.set_ylabel("Growth of $1")
+    for ax in (ax1, ax2):
+        ax.xaxis.set_major_locator(mdates.YearLocator())
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
     fig.tight_layout(); fig.savefig(RES / "equity_curves.png"); plt.close(fig)
     print("wrote results/equity_curves.png")
 
