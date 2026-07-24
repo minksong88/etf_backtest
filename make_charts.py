@@ -89,7 +89,42 @@ def chart_equity():
     print("wrote results/equity_curves.png")
 
 
+def chart_windows():
+    """집계기간 W=5/10/20 별 SPY-초과수익 — 신호 4개 소분할 패널."""
+    p = DATA / "event_study_spy_windows.csv"
+    if not p.exists():
+        print("skip windows (event_study_spy_windows.csv 없음)"); return
+    d = pd.read_csv(p)
+    cats = ["confirm_dn", "confirm_up", "bull_div", "bear_div"]
+    titles = {"confirm_dn": "confirm_dn  (price DOWN + outflow) — washout/bottom",
+              "confirm_up": "confirm_up  (price UP + inflow) — trend follow",
+              "bull_div": "bull_div  (price DOWN + inflow) — falling knife",
+              "bear_div": "bear_div  (price UP + weak flow) — top"}
+    wcol = {5: "#c0504d", 10: "#b07d2a", 20: "#2f6b8f"}
+    fig, axes = plt.subplots(2, 2, figsize=(11, 7), sharex=True)
+    hs = [5, 10, 20, 60]
+    for ax, cat in zip(axes.ravel(), cats):
+        for W in [5, 10, 20]:
+            sub = d[(d.category == cat) & (d.agg_window == W)].set_index("horizon").reindex(hs)
+            ax.plot(range(len(hs)), sub["exspy_pct"], marker="o", ms=4,
+                    color=wcol[W], lw=1.7, label=f"W={W}")
+            for xi, (v, t) in enumerate(zip(sub["exspy_pct"], sub["t"])):
+                if abs(t) >= 1.96:
+                    ax.annotate("•", (xi, v), color=wcol[W], ha="center",
+                                va="bottom", fontsize=11, fontweight="bold")
+        ax.axhline(0, color="#333", lw=.7)
+        ax.set_title(titles[cat], fontsize=9.5, loc="left")
+        ax.set_xticks(range(len(hs))); ax.set_xticklabels([f"{h}d" for h in hs])
+        ax.set_ylabel("vs SPY (%)", fontsize=9)
+        ax.legend(fontsize=8, loc="best")
+    fig.suptitle("Flow×Price signals vs SPY, by aggregation window W  "
+                 "(• = |t|≥1.96)   65 ETF, 2022–2026", fontsize=11)
+    fig.tight_layout(); fig.savefig(RES / "windows_spy.png"); plt.close(fig)
+    print("wrote results/windows_spy.png")
+
+
 if __name__ == "__main__":
     chart_event_study()
     chart_hitrate()
+    chart_windows()
     chart_equity()

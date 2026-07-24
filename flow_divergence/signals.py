@@ -38,8 +38,10 @@ def compute_features(panel: pd.DataFrame, p: Params = DEFAULT) -> pd.DataFrame:
     df["flow_aum"] = df["flow"] / df["aum"]
 
     # 최근 자금흐름 강도: 최근 flow_window 일 순유입 합 / 현재 AUM
+    # (min_periods 는 창 크기를 넘지 않도록 조정 — 짧은 W 도 안전)
+    mp = max(1, min(p.flow_min_obs, p.flow_window))
     fsum = g["flow"].transform(
-        lambda s: s.rolling(p.flow_window, min_periods=p.flow_min_obs).sum()
+        lambda s: s.rolling(p.flow_window, min_periods=mp).sum()
     )
     df["flow_intensity"] = fsum / df["aum"]
 

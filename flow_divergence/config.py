@@ -26,8 +26,10 @@ class Params:
     hold_days: int = 20          # 포지션 보유 기간 (거래일)
     horizons: tuple = (5, 10, 20, 60)  # 이벤트 스터디 전방 수익률 구간
 
-    # --- 유니버스 ---
-    benchmark: str = "SPY"       # 시장수익률 벤치마크(참고용). 핵심 분석은 유니버스 중립.
+    # --- 유니버스 / 벤치마크 ---
+    benchmark: str = "SPY"       # 시장수익률 벤치마크 티커
+    bench_mode: str = "spy"      # 대표 초과수익 기준: 'spy'(SPY 차감) | 'demean'(유니버스 평균 차감)
+    #  ※ 멀티에셋 유니버스(주식섹터+금+원유+비트코인)라 횡단면 평균은 의미가 약함 → 기본 'spy'
 
 
 DEFAULT = Params()

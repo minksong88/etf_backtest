@@ -37,7 +37,8 @@ def main():
     # 1) 이벤트 스터디
     es = bt.event_study(panel, DEFAULT)
     es.to_csv(RESULTS / "event_study.csv", index=False)
-    print("\n=== 이벤트 스터디 (유니버스 중립 전방수익률) ===")
+    bench = "SPY 초과" if DEFAULT.bench_mode == "spy" else "유니버스 중립"
+    print(f"\n=== 이벤트 스터디 ({bench} 전방수익률, W={DEFAULT.flow_window}) ===")
     print(es.to_string(index=False))
 
     # 2) 일별 롱숏 포트폴리오

@@ -21,37 +21,50 @@ from . import stats as st
 def event_study(panel: pd.DataFrame, p: Params = DEFAULT) -> pd.DataFrame:
     """카테고리 × 호라이즌별 전방수익률 통계.
 
-    두 가지 벤치마크로 측정:
-      raw    : ETF 자체 전방수익률 (entry_lag 반영, 거래가능)
-      demean : 같은 날짜 유니버스 평균을 뺀 '유니버스 중립' 초과수익률
-               (섹터/시장 방향을 통제한 순수 시그널 알파. 롱숏이 실제로 먹는 부분)
+    세 가지 벤치마크를 모두 계산해 컬럼으로 반환한다:
+      raw     : ETF 자체 전방수익률 (entry_lag 반영, 거래가능)
+      exspy   : SPY 전방수익률을 뺀 '시장 대비' 초과수익  ← 멀티에셋 유니버스 기본
+      demean  : 같은 날짜 유니버스 평균을 뺀 '유니버스 중립' 초과수익 (더 보수적)
+
+    `p.bench_mode`('spy'|'demean')가 대표 지표(`bench_mean`,`t_stat`,`beat_pct`)를 결정한다.
+    멀티에셋(주식섹터+금+원유+비트코인) 유니버스에서는 횡단면 평균이 의미가 약하므로
+    SPY 초과를 기본으로 둔다.
     """
     df = compute_features(panel, p)
     g = df.groupby("ticker", sort=False)
-
     lag = p.entry_lag
-    # 진입 시점 가격 (t+lag)
     df["p_entry"] = g["px"].shift(-lag)
-    rows = []
+
+    # 먼저 거래가능 전방수익률과 유니버스 평균을 계산
     for h in p.horizons:
         exit_px = g["px"].shift(-(lag + h))
         df[f"raw_{h}"] = exit_px / df["p_entry"] - 1.0
-        # 유니버스 중립: 같은 날짜의 횡단면 평균 제거
         df[f"dm_{h}"] = df[f"raw_{h}"] - df.groupby("date")[f"raw_{h}"].transform("mean")
 
+    # SPY 전방수익률(진입 t+lag 기준)을 날짜→값 맵으로 만들어 초과수익 계산
+    spy = df[df["ticker"] == p.benchmark].drop_duplicates("date").set_index("date")
+    for h in p.horizons:
+        spy_fwd = df["date"].map(spy[f"raw_{h}"])
+        df[f"xs_{h}"] = df[f"raw_{h}"] - spy_fwd
+
+    prefix = "xs" if p.bench_mode == "spy" else "dm"
     out = []
     for cat in CATEGORIES:
         sub = df[df["category"] == cat]
         for h in p.horizons:
             raw = sub[f"raw_{h}"].dropna()
+            xs = sub[f"xs_{h}"].dropna()
             dm = sub[f"dm_{h}"].dropna()
-            bs = st.block_bootstrap_mean_ci(dm.values, block=h)
+            bench = sub[f"{prefix}_{h}"].dropna()
+            bs = st.block_bootstrap_mean_ci(bench.values, block=h)
             out.append(dict(
-                category=cat, horizon=h, n=int(dm.shape[0]),
+                category=cat, horizon=h, n=int(bench.shape[0]),
                 raw_mean=float(raw.mean()) if len(raw) else np.nan,
+                exspy_mean=float(xs.mean()) if len(xs) else np.nan,
                 demean_mean=float(dm.mean()) if len(dm) else np.nan,
-                beat_peers=float((dm > 0).mean()) if len(dm) else np.nan,
-                t_naive=st.naive_tstat(dm.values),
+                bench_mean=float(bench.mean()) if len(bench) else np.nan,
+                beat_pct=float((bench > 0).mean()) if len(bench) else np.nan,
+                t_stat=st.naive_tstat(bench.values),
                 boot_p=bs["p"], boot_lo=bs["lo"], boot_hi=bs["hi"],
             ))
     return pd.DataFrame(out)
